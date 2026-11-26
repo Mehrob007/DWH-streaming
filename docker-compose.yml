@@ -1,0 +1,114 @@
+name: dwh-streaming
+
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: dwh-rustfs
+    restart: unless-stopped
+    ports:
+      - "${RUSTFS_PORT:-9002}:9000"
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin123}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - rustfs_data:/data
+    networks:
+      - dwh-network
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: dwh-redpanda
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - "512M"
+      - --overprovisioned
+      - --node-id
+      - "0"
+      - --kafka-addr
+      - "PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092"
+      - --advertise-kafka-addr
+      - "PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092"
+      - --set
+      - "auto_create_topics_enabled=true"
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    networks:
+      - dwh-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: dwh-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-sales}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-admin123}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - dwh-network
+
+  spark:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    container_name: dwh-spark
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./spark:/app
+    depends_on:
+      - clickhouse
+      - redpanda
+    command: >
+      bash -c "echo 'Waiting for Redpanda and ClickHouse...' &&
+      sleep 6 &&
+      /opt/spark/bin/spark-submit
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1
+      /app/streaming_orders.py"
+    networks:
+      - dwh-network
+
+  superset:
+    build: .
+    container_name: dwh-superset
+    restart: unless-stopped
+    ports:
+      - "${SUPERSET_PORT:-8088}:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change-me-to-any-long-random-string-123456}
+    volumes:
+      - superset_home:/app/superset_home
+    depends_on:
+      - clickhouse
+    command: >
+      bash -c "superset db upgrade &&
+      (superset fab create-admin --username ${SUPERSET_ADMIN_USER:-admin} --firstname Admin --lastname User --email admin@example.com --password ${SUPERSET_ADMIN_PASSWORD:-admin123} || true) &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088"
+    networks:
+      - dwh-network
+
+networks:
+  dwh-network:
+    driver: bridge
+
+volumes:
+  rustfs_data:
+  ch_data:
+  superset_home:

@@ -1,0 +1,18 @@
+order_id,order_date,client,city,amount
+101,2026-11-05,Kolya,Dushanbe,500.00
+102,2026-11-05, Aziz ,Dushanbe,750.00
+102,2026-11-05, Aziz ,Dushanbe,750.00
+103,2026-11-06,Sitora,Bokhtar,
+104,2026-11-06,Rustam,Khujand,1300.50
+105,2026-11-07,Kurbonali,dushanbe,420.00
+106,2026-11-07,Dilshod,Kulob,950.00
+107,2026-11-08, Madina ,Istaravshan,1450.00
+108,2026-11-08,Farrukh,Panjakent,2100.00
+109,2026-11-09, Aziz ,Dushanbe,
+110,2026-11-09,Sitora,Khujand,880.00
+111,2026-11-10,Rustam,dushanbe,1250.00
+112,2026-11-10,Kolya,Kulob,620.00
+113,2026-11-11,Kurbonali,Bokhtar,1750.00
+114,2026-11-11,Dilshod,Dushanbe,3200.00
+115,2026-11-12, Madina ,Khujand,990.00
+
